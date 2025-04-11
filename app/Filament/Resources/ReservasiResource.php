@@ -18,6 +18,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\ForceDeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use App\Filament\Resources\ReservasiResource\Pages;
+use App\Models\Ruangan;
 
 class ReservasiResource extends Resource
 {
@@ -35,12 +36,12 @@ class ReservasiResource extends Resource
                 ->searchable()
                 ->required(),
 
-            Select::make('ruangan')
-                ->options([
-                    'Reguler' => 'Reguler',
-                    'VIP' => 'VIP',
-                ])
+            Select::make('ruangan_id')
+                ->label('Ruangan')
+                ->options(Ruangan::pluck('tipe', 'id'))
+                ->searchable()
                 ->required(),
+
 
             DatePicker::make('tanggal')->required(),
 
@@ -70,7 +71,7 @@ class ReservasiResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('user.name')->label('User')->sortable()->searchable(),
-                TextColumn::make('ruangan')->searchable(),
+                TextColumn::make('ruangan.tipe')->label('Ruangan')->sortable()->searchable(),
                 TextColumn::make('tanggal')->date(),
                 TextColumn::make('jam_mulai')->label('Jam Mulai'),
                 TextColumn::make('durasi')->label('Durasi (jam)'),

@@ -10,7 +10,12 @@ class Reservasi extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'ruangan', 'tanggal', 'jam_mulai', 'durasi', 'jam_selesai', 'status'];
+    protected $fillable = ['user_id', 'ruangan_id', 'tanggal', 'jam_mulai', 'durasi', 'jam_selesai', 'status'];
+
+    public function ruangan(): BelongsTo
+    {
+        return $this->belongsTo(Ruangan::class);
+    }
 
     public function user(): BelongsTo
     {

@@ -3,28 +3,32 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use Livewire\Attributes\Layout;
 use App\Models\Reservasi;
+use App\Models\Ruangan;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth; //
+use Illuminate\Support\Facades\Auth;
 
-#[Layout('layouts.app')]
 class ReservasiBooking extends Component
 {
-    public $ruangan;
+    public $tipeRuangan;
     public $tanggal;
     public $jamMulai;
     public $durasi;
     public $jamSelesai = '00:00';
     public $showSuccess = false;
 
-    public function updatedJamMulai($value)
+    public function mount()
+    {
+        $this->tipeRuangan = 'Reguler'; // default
+    }
+
+    public function updatedJamMulai()
     {
         $this->durasi = null;
         $this->updateJamSelesai();
     }
 
-    public function updatedDurasi($value)
+    public function updatedDurasi()
     {
         $this->updateJamSelesai();
     }
@@ -42,37 +46,62 @@ class ReservasiBooking extends Component
     public function submit()
     {
         $this->validate([
-            'ruangan'    => 'required|in:Reguler,VIP',
-            'tanggal'    => 'required|date',
-            'jamMulai'   => 'required',
-            'durasi'     => 'required|numeric|min:1|max:3',
-            'jamSelesai' => 'required',
+            'tipeRuangan' => 'required',
+            'tanggal'     => 'required|date',
+            'jamMulai'    => 'required',
+            'durasi'      => 'required|numeric|min:1|max:3',
         ]);
 
-        Reservasi::create([
-            'user_id' => Auth::id(),
-            'ruangan'     => $this->ruangan,
-            'tanggal'     => $this->tanggal,
-            'jam_mulai'   => $this->jamMulai,
-            'durasi'      => $this->durasi,
-            'jam_selesai' => $this->jamSelesai,
-        ]);
+        $this->jamSelesai = Carbon::createFromFormat('H:i', $this->jamMulai)
+            ->addHours($this->durasi)
+            ->format('H:i');
 
-        $this->showSuccess = true;
+        $ruangans = Ruangan::where('tipe', $this->tipeRuangan)->get();
 
-        $this->reset([
-            'ruangan',
-            'tanggal',
-            'jamMulai',
-            'durasi',
-            'jamSelesai',
-        ]);
+        foreach ($ruangans as $ruangan) {
+            $bentrok = Reservasi::where('ruangan_id', $ruangan->id)
+                ->where('tanggal', $this->tanggal)
+                ->where(function ($query) {
+                    $query->whereBetween('jam_mulai', [$this->jamMulai, $this->jamSelesai])
+                        ->orWhereBetween('jam_selesai', [$this->jamMulai, $this->jamSelesai])
+                        ->orWhere(function ($q) {
+                            $q->where('jam_mulai', '<=', $this->jamMulai)
+                                ->where('jam_selesai', '>=', $this->jamSelesai);
+                        });
+                })
+                ->exists();
 
-        $this->jamSelesai = '00:00';
+            if (! $bentrok) {
+                Reservasi::create([
+                    'user_id'     => Auth::id(),
+                    'ruangan_id'  => $ruangan->id, // ✅ inilah yang wajib ada!
+                    'tanggal'     => $this->tanggal,
+                    'jam_mulai'   => $this->jamMulai,
+                    'durasi'      => $this->durasi,
+                    'jam_selesai' => $this->jamSelesai,
+                ]);
+
+                $this->showSuccess = true;
+
+                $this->reset([
+                    'tanggal',
+                    'jamMulai',
+                    'durasi',
+                    'jamSelesai',
+                ]);
+
+                $this->jamSelesai = '00:00';
+
+                return;
+            }
+        }
+
+        $this->addError('tipeRuangan', 'Semua ruangan ' . $this->tipeRuangan . ' sedang penuh di jam tersebut.');
     }
+
 
     public function render()
     {
-        return view('livewire.reservasi-booking');
+        return view('livewire.reservasi-booking')->layout('layouts.app');
     }
 }
